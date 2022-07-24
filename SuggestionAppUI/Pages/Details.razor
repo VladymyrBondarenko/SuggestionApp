@@ -1,0 +1,123 @@
+﻿@page "/Details/{Id}"
+@inject ISuggestionData suggestionData
+@inject IUserData userData
+@inject NavigationManager navManager
+@inject AuthenticationStateProvider authProvider
+
+<div>
+    <div>
+        @if(suggestion is not null)
+        {
+            <div>
+                <div>
+                    <div>
+                        <div>@GetUpvoteTopText()</div>
+                        <span class="oi oi-caret-top"></span>
+                        <div>@GetUpVoteBottomText()</div>
+                    </div>
+                    <div>
+                        <div>@suggestion.DateCreated.ToShortDateString()</div>
+                    </div>
+                </div>
+                <div>
+                    <div>@suggestion.Suggestion</div>
+                    <div>@suggestion.Author.DisplayName</div>
+                    <div>@suggestion.SuggestionDescription</div>
+                    <div>
+                        @suggestion.Category.CategoryName
+                    </div>
+                </div>
+                <div>
+                    <button @onclick="ClosePage"></button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@if(suggestion?.SuggestionStatus is not null)
+{
+    <div>
+        <div>
+            <div>
+            </div>
+            <div>
+                <div>
+                    @suggestion.SuggestionStatus.StatusName
+                </div>
+                <div>
+                    @((MarkupString)suggestion.OwnerNotes)
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public string Id { get; set; }
+
+    private SuggestionModel suggestion;
+
+    private UserModel loggedInUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        suggestion = await suggestionData.GetSuggestion(Id);
+        loggedInUser = await authProvider.GetUserModelFromAuth(userData);
+    }
+
+    private void ClosePage()
+    {
+        navManager.NavigateTo("/");
+    }
+
+    private string GetUpvoteTopText()
+    {
+        var topText = "ClickTo";
+        if (suggestion.UserVotes?.Count > 0)
+        {
+            topText = suggestion.UserVotes.Count.ToString("00");
+        }
+        else if(suggestion.Author.Id == loggedInUser?.Id)
+        {
+            topText = "Awaiting";
+        }
+        return topText;
+    }
+
+    private string GetUpVoteBottomText()
+    {
+        if (suggestion.UserVotes?.Count > 1)
+        {
+            return "Upvotes";
+        }
+        else
+        {
+            return "Upvote";
+        }
+    }
+
+    private async Task VoteUp()
+    {
+        if(loggedInUser is not null)
+        {
+            if(suggestion.Author.Id == loggedInUser.Id)
+            {
+                return;
+            }
+
+            if (!suggestion.UserVotes.Add(loggedInUser.Id))
+            {
+                suggestion.UserVotes.Remove(loggedInUser.Id);
+            }
+
+            await suggestionData.UpvoteSuggestion(suggestion.Id, loggedInUser.Id);
+        }
+        else
+        {
+            navManager.NavigateTo("/MicrosoftIdentity/Account/SignIn", true);
+        }
+    }
+}
